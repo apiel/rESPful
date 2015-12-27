@@ -14,18 +14,22 @@ function httpd_init()
     srv:listen(80,function(conn) 
         conn:on("receive",function(conn,payload) 
             --print(payload)
-            local commands = string.match(payload,"commands=([%.%w%%+]+)") 
+            local commands = string.match(payload,"commands=([%.%w%%+%(%)%_%-]+)") 
             if commands then
                 commands = httpd_urldecode(commands)
                 print("http command: " .. commands)
                 local output = cmd(commands)
-                print(output)
-                conn:send(output .. "\n")
+                --print(output)
+                httpd_send_data(conn, output .. "\n")
             else
-                conn:send("No command")
+                httpd_send_data(conn, "No command")
             end
             conn:close()
             collectgarbage()
         end) 
     end)
+end
+
+function httpd_send_data(conn, data)
+    conn:send(data)
 end

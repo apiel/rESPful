@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="author" content="Alexandre Piel">
+        <title>NodeMCU IDE</title>
+        <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+        <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet" media="all" />        
+        <style>
+            #files{
+                margin-top: 10px;
+            }
+            #sidebar, #content{
+                padding: 10px;
+            }
+            #editor{
+                min-height: 250px;
+            }
+            #action{
+                padding: 10px 0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-xs-3" id="sidebar">
+                    <div class="input-group" id="node-load">
+                        <input type="text" class="form-control" placeholder="NodeMCU IP" />
+                        <span class="input-group-btn">
+                            <button class="btn btn-default">Load</button>
+                        </span>
+                    </div>
+                    <ul id="files" class="list-group"></ul>
+                </div>
+                <div class="col-xs-9" id="content">
+                    <textarea class="form-control" id="editor"></textarea>
+                    <div id="action">
+                        <button class="btn btn-default" id="save">Save</button>
+                        <button class="btn btn-default" id="dofile">Dofile</button>
+                        <button class="btn btn-default" id="delete">Delete</button>
+                    </div>
+                    <div id="output"></div>
+                </div>
+            </div>
+        </div>
+<script>
+(function ($) {     
+    var nodeMcuIde = function () {
+        this.init();
+    };
+    nodeMcuIde.prototype = {
+        ip: null,
+        init: function() { 
+            var me = this;
+            $('#node-load').click(function() { me.load($(this)); });
+            $('#files').on('click', 'li', function() { me.select($(this)); });
+            $('#save').on('click', function() { me.save(); });
+            $('#dofile').on('click', function() { me.dofile(); });
+            $('#delete').on('click', function() { me.delete(); });
+        },
+        delete: function() {
+            var me = this;
+            var file = $("#files .active").text();
+            if (file.length && confirm("You will now delete the file " + file)) {
+                var commands = "file.remove(\""+file+"\")";
+                me.ajax(commands, function(json) {
+                    me.loadFiles();
+                    $("#output").html('');
+                    $("#editor").val('');
+                });
+            }
+        },
+        dofile: function() {
+            var me = this;
+            var file = $("#files .active").text();
+            if (file.length) {
+               var commands = "dofile(\""+file+"\")";
+               $("#output").html('');
+                me.ajax(commands, function(json) {
+                    $("#output").html('<div class="alert alert-info alert-dismissible" role="alert">\
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>\
+                        '+json.join("<br />")+'\
+                      </div>');
+                });
+            }
+        },        
+        save: function() {
+            var me = this;
+            var file = $("#files .active").text();
+            if (file.length) {
+               var commands = "\
+file.remove(\""+file+"\")\
+file.open(\""+file+"\",\"w+\")\
+file.write([["+$("#editor").val()+"]])\
+file.close()";
+                me.ajax(commands);
+            }
+        },
+        select: function(item) {
+            var me = this;
+            $('#files li').removeClass('active');
+            item.addClass('active');
+            me.open(item.text());
+        },
+        open: function(file) {
+            var me = this;
+            var commands = "\
+file.open(\""+file+"\", \"r\")\
+print(file.read())\
+file.close()";
+            $("#editor").text("loading...");
+            me.ajax(commands, function(json){
+                $("#editor").val(json.join("\n"));
+            });           
+        },
+        load: function(form) {
+            var me = this;
+            me.ip = form.find('input').val();
+            me.setJSONPresponse();
+            //me.loadFiles();
+        },
+        setJSONPresponse: function() {
+            var me = this;
+            var commands = "\
+function httpd_send_data(conn, data)\
+   conn:send(\"jsonCallback([\\\"\" .. string.gsub(string.gsub(data,\"\\\"\",\"\\\\\\\"\"),\"\\n\",\"\\\",\\\"\") .. \"\\\"])\")\
+end";
+            me.ajax(commands, function(json){
+                me.loadFiles();
+            })        
+        },
+        loadFiles: function() {
+            var me = this;
+            var commands =  "\
+l = file.list();\
+for filename,size in pairs(l) do\
+   print(filename)\
+end";            
+            $("#files").html("");
+            me.ajax(commands, function(json){
+                $.each(json, function() {
+                    if (this.length) {
+                        $("#files").append("<li class='list-group-item'>"+this+"</li>");
+                    }
+                });
+            })            
+        },
+        ajax: function(commands, callback) {
+            var me = this;
+            var params = {
+                "commands": commands 
+            }            
+            $.ajax({
+               type: 'POST',
+                url: "http://" + me.ip,
+                data: params,
+                async: false,
+                jsonpCallback: 'jsonCallback',
+                contentType: "application/json",
+                dataType: 'jsonp',
+                success: function(json) {
+                   if (typeof(callback) !== 'undefined') {
+                       callback(json);
+                   }
+                }
+            });            
+        }
+    };
+    
+    $.nodeMcuIde = new nodeMcuIde();
+}(jQuery));
+
+</script>
+    </body>
+</html>

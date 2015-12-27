@@ -1,6 +1,7 @@
 dofile("wifi.lua")
 dofile("httpd.lua")
 dofile("cmd.lua")
+dofile("http.lua")
 
 wifi_init(function()
     http_send_request("localhost", "127.0.0.1", 80, "/commands.html", function(conn, data) 
