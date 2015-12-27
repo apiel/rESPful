@@ -1,0 +1,11 @@
+dofile("wifi.lua")
+dofile("httpd.lua")
+dofile("cmd.lua")
+
+wifi_init(function()
+    http_send_request("localhost", "127.0.0.1", 80, "/commands.html", function(conn, data) 
+        local commands = string.sub(data,string.find(data, "\n\r\n"),-1)
+        print(cmd(commands))
+    end)
+end)
+httpd_init()
