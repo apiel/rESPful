@@ -12,6 +12,9 @@
             #files{
                 margin-top: 10px;
             }
+            #files li{
+                cursor: pointer;
+            }
             #sidebar, #content{
                 padding: 10px;
             }
@@ -56,11 +59,20 @@
         init: function() { 
             var me = this;
             $('#node-load').click(function() { me.load($(this)); });
-            $('#files').on('click', 'li', function() { me.select($(this)); });
+            $('#files').on('click', 'li:not(#add-file)', function() { me.select($(this)); });
+            $('#files').on('click', '#add-file', function() { me.addFile(); });
             $('#save').on('click', function() { me.save(); });
             $('#dofile').on('click', function() { me.dofile(); });
             $('#delete').on('click', function() { me.delete(); });
         },
+       addFile: function() {
+           var me = this;
+           var filename = prompt("Provide filename");
+           if (filename.length) {
+               me.write(filename, "");
+               me.loadFiles();
+           }
+       },
         delete: function() {
             var me = this;
             var file = $("#files .active").text();
@@ -91,13 +103,17 @@
             var me = this;
             var file = $("#files .active").text();
             if (file.length) {
-               var commands = "\
+               me.write(file, $("#editor").val());
+            }
+        },
+        write: function(file, content) {
+            var me = this;
+            var commands = "\
 file.remove(\""+file+"\")\
 file.open(\""+file+"\",\"w+\")\
-file.write([["+$("#editor").val()+"]])\
+file.write([["+content+"]])\
 file.close()";
-                me.ajax(commands);
-            }
+            me.ajax(commands);
         },
         select: function(item) {
             var me = this;
@@ -113,7 +129,7 @@ print(file.read())\
 file.close()";
             $("#editor").text("loading...");
             me.ajax(commands, function(json){
-                $("#editor").val(json.join("\n"));
+                $("#editor").val(json.map(function(line) { return line.replace("\n", "\\n"); }).join("\n"));
             });           
         },
         load: function(form) {
@@ -146,6 +162,7 @@ end";
                         $("#files").append("<li class='list-group-item'>"+this+"</li>");
                     }
                 });
+                $("#files").append("<li class='list-group-item' id='add-file'><span class='glyphicon glyphicon-plus'></span> Add new file</li>");
             })            
         },
         ajax: function(commands, callback) {
